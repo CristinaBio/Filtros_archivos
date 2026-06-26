@@ -1,0 +1,259 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--text-primary)}
+.wrap{padding:1.5rem 0;max-width:100%}
+.zone{border:1.5px dashed var(--border-strong);border-radius:12px;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--surface-1)}
+.zone:hover,.zone.over{border-color:var(--border-accent);background:var(--bg-accent)}
+.zone i{font-size:36px;color:var(--text-muted);margin-bottom:.75rem;display:block}
+.zone p{color:var(--text-secondary);font-size:14px}
+.zone strong{color:var(--text-primary);font-size:15px;display:block;margin-bottom:.25rem}
+#file-input{display:none}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:transparent;color:var(--text-primary);font-size:13px;cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface-1)}
+.btn-accent{background:var(--fill-accent);border-color:var(--fill-accent);color:var(--on-accent)}
+.btn-accent:hover{background:var(--fill-accent-hover);border-color:var(--fill-accent-hover)}
+.btn-success{background:var(--fill-success);border-color:var(--fill-success);color:var(--on-success)}
+.btn-success:hover{background:var(--fill-success-hover)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:1rem 0}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:1rem 0;padding:1rem;background:var(--surface-1);border-radius:12px;border:0.5px solid var(--border)}
+.filter-item label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.filter-item input,.filter-item select{width:100%;padding:5px 8px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface-2);color:var(--text-primary)}
+.filter-item input:focus,.filter-item select:focus{outline:none;border-color:var(--border-accent)}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:.75rem 0}
+.stat{background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--radius);padding:.5rem .85rem}
+.stat span{display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+.stat strong{font-size:18px;font-weight:500}
+.tbl-wrap{overflow-x:auto;border:0.5px solid var(--border);border-radius:12px;margin:1rem 0}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
+thead th{background:var(--surface-1);padding:8px 12px;text-align:left;font-weight:500;font-size:12px;color:var(--text-secondary);border-bottom:0.5px solid var(--border-strong);white-space:nowrap;position:sticky;top:0}
+tbody tr{border-bottom:0.5px solid var(--border)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg-accent)}
+tbody td{padding:7px 12px;color:var(--text-primary);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.empty{text-align:center;padding:2rem;color:var(--text-muted);font-size:14px}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:var(--bg-accent);color:var(--text-accent);border:0.5px solid var(--border-accent)}
+.section-title{font-size:12px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin:.5rem 0}
+.search-global input{width:100%;padding:7px 12px;border:0.5px solid var(--border-strong);border-radius:var(--radius);font-size:13px;background:var(--surface-2);color:var(--text-primary)}
+.search-global input:focus{outline:none;border-color:var(--border-accent)}
+.export-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hidden{display:none}
+#main-panel{display:none}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<div class="wrap">
+  <div id="upload-panel">
+    <div class="zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+      <strong>Carga tu archivo de datos</strong>
+      <p>Arrastra aquí o haz clic para seleccionar · Excel (.xlsx, .xls) o CSV (.csv)</p>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls,.csv">
+  </div>
+
+  <div id="main-panel">
+    <div class="toolbar">
+      <button class="btn btn-sm" id="btn-reset-file" onclick="resetFile()"><i class="ti ti-upload" aria-hidden="true"></i> Cargar otro archivo</button>
+      <span id="file-badge" class="tag"></span>
+      <div style="flex:1"></div>
+      <button class="btn btn-sm" id="btn-clear-filters" onclick="clearFilters()"><i class="ti ti-x" aria-hidden="true"></i> Limpiar filtros</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span>Total filas</span><strong id="stat-total">0</strong></div>
+      <div class="stat"><span>Filas visibles</span><strong id="stat-visible">0</strong></div>
+      <div class="stat"><span>Columnas</span><strong id="stat-cols">0</strong></div>
+    </div>
+
+    <div class="section-title">Búsqueda global</div>
+    <div class="search-global" style="margin-bottom:.75rem">
+      <input type="text" id="global-search" placeholder="Buscar en todas las columnas..." oninput="applyFilters()">
+    </div>
+
+    <div class="section-title">Filtros por columna</div>
+    <div class="filter-grid" id="filter-grid"></div>
+
+    <div class="section-title">Resultados</div>
+    <div class="tbl-wrap" style="max-height:380px;overflow-y:auto">
+      <table id="data-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="export-row" style="margin-top:1rem">
+      <span class="section-title" style="margin:0">Exportar resultados:</span>
+      <button class="btn btn-success" onclick="exportData('xlsx')"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Excel (.xlsx)</button>
+      <button class="btn" onclick="exportData('csv')"><i class="ti ti-file-text" aria-hidden="true"></i> CSV</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let allData = [];
+let headers = [];
+let filteredData = [];
+let fileName = '';
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+fileInput.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  fileName = file.name;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(ext === 'csv') {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: res => { loadData(res.data, res.meta.fields); }
+    });
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, {defval:''});
+      const hdrs = json.length ? Object.keys(json[0]) : [];
+      loadData(json, hdrs);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function loadData(data, hdrs) {
+  allData = data;
+  headers = hdrs;
+  document.getElementById('upload-panel').style.display = 'none';
+  document.getElementById('main-panel').style.display = 'block';
+  document.getElementById('file-badge').textContent = fileName;
+  document.getElementById('stat-total').textContent = allData.length;
+  document.getElementById('stat-cols').textContent = headers.length;
+  buildFilters();
+  buildTableHead();
+  applyFilters();
+}
+
+function buildFilters() {
+  const grid = document.getElementById('filter-grid');
+  grid.innerHTML = '';
+  headers.forEach(col => {
+    const vals = [...new Set(allData.map(r => String(r[col] ?? '')).filter(v => v !== ''))].sort();
+    const isShort = vals.length <= 20;
+    const div = document.createElement('div');
+    div.className = 'filter-item';
+    div.innerHTML = `<label>${col}</label>`;
+    if(isShort) {
+      const sel = document.createElement('select');
+      sel.id = 'f_' + btoa(encodeURIComponent(col));
+      sel.innerHTML = `<option value="">— todos —</option>` + vals.map(v => `<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('');
+      sel.addEventListener('change', applyFilters);
+      div.appendChild(sel);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'f_' + btoa(encodeURIComponent(col));
+      inp.placeholder = `Filtrar ${col}...`;
+      inp.addEventListener('input', applyFilters);
+      div.appendChild(inp);
+    }
+    grid.appendChild(div);
+  });
+}
+
+function getFilterId(col) { return 'f_' + btoa(encodeURIComponent(col)); }
+
+function applyFilters() {
+  const global = (document.getElementById('global-search').value || '').toLowerCase();
+  filteredData = allData.filter(row => {
+    for(const col of headers) {
+      const el = document.getElementById(getFilterId(col));
+      if(!el) continue;
+      const val = String(row[col] ?? '').toLowerCase();
+      const term = el.value.toLowerCase();
+      if(term && !val.includes(term)) return false;
+    }
+    if(global) {
+      const rowStr = headers.map(c => String(row[c] ?? '')).join(' ').toLowerCase();
+      if(!rowStr.includes(global)) return false;
+    }
+    return true;
+  });
+  document.getElementById('stat-visible').textContent = filteredData.length;
+  renderTable();
+}
+
+function renderTable() {
+  const body = document.getElementById('table-body');
+  if(!filteredData.length) {
+    body.innerHTML = `<tr><td colspan="${headers.length}" class="empty">Sin resultados para los filtros aplicados.</td></tr>`;
+    return;
+  }
+  const max = Math.min(filteredData.length, 500);
+  body.innerHTML = filteredData.slice(0, max).map(row =>
+    `<tr>${headers.map(c => `<td title="${String(row[c]??'').replace(/"/g,'&quot;')}">${row[c]??''}</td>`).join('')}</tr>`
+  ).join('');
+  if(filteredData.length > 500) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="${headers.length}" style="text-align:center;padding:8px;color:var(--text-muted);font-size:12px">Mostrando 500 de ${filteredData.length} filas. Exporta para ver todas.</td>`;
+    body.appendChild(tr);
+  }
+}
+
+function buildTableHead() {
+  document.getElementById('table-head').innerHTML =
+    `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+}
+
+function clearFilters() {
+  document.getElementById('global-search').value = '';
+  headers.forEach(col => {
+    const el = document.getElementById(getFilterId(col));
+    if(el) el.value = '';
+  });
+  applyFilters();
+}
+
+function resetFile() {
+  allData = []; headers = []; filteredData = []; fileName = '';
+  document.getElementById('file-input').value = '';
+  document.getElementById('main-panel').style.display = 'none';
+  document.getElementById('upload-panel').style.display = 'block';
+}
+
+function exportData(format) {
+  if(!filteredData.length) { alert('No hay datos para exportar.'); return; }
+  const baseName = fileName.replace(/\.[^.]+$/, '') + '_filtrado';
+  if(format === 'csv') {
+    const csv = Papa.unparse(filteredData, {columns: headers});
+    const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+    download(blob, baseName + '.csv');
+  } else {
+    const ws = XLSX.utils.json_to_sheet(filteredData, {header: headers});
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Datos');
+    XLSX.writeFile(wb, baseName + '.xlsx');
+  }
+}
+
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
